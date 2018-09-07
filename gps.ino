@@ -1,28 +1,49 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1351.h>
+#include <Adafruit_ST7735.h>
 #include <SPI.h>
 #include <TinyGPS++.h>
+#include <DueTimer.h>
 
 static constexpr uint32_t GPSBaud = 9600;
 
 TinyGPSPlus gps;
 
-#define sclk 2
-#define mosi 3
+#define sck 3
+#define mosi 2
 #define dc   4
 #define cs   5
 #define rst  6
-Adafruit_SSD1351 tft = Adafruit_SSD1351(cs, dc, mosi, sclk, rst);
+Adafruit_SSD1351 tft(cs, dc, mosi, sck, rst);
+//Adafruit_ST7735 tft(cs, dc, mosi, sck, rst);
+
+#define PRINT(...) tft.print(__VA_ARGS__)
+#define PRINTLN(...) tft.println(__VA_ARGS__)
+
+inline void blinkLED()
+{
+  static bool ledOn = false;
+  ledOn = !ledOn;
+  if (ledOn)
+    PIOB->PIO_SODR=1<<27; //lights the LED
+  else
+    PIOB->PIO_CODR=1<<27; //clears it
+}
 
 void setup()
 {
-//  Serial.begin(115200);
+  Serial.begin(115200);
   Serial2.begin(GPSBaud);
+ // tft.initR(INITR_144GREENTAB);
   tft.begin();
   tft.fillScreen(0x0000);
   tft.setTextSize(1);
   tft.setTextColor(0xFFFF, 0x0000);
   tft.setTextWrap(true);
+
+  pinMode(13, OUTPUT);
+
+  Timer3.attachInterrupt(&blinkLED);
 }
 
 void loop()
@@ -37,55 +58,75 @@ void loop()
 
 void displayInfo()
 {
+  static uint32_t nSatsPrevious = ~0;
+
   tft.setCursor(0, 0);
 
   const auto nSats = gps.satellites.value();
-  if (nSats == 0)
-    tft.setTextColor(0xFFE0, 0x0000);
-  else if (nSats >= 4)
-    tft.setTextColor(0x07E0, 0x0000);
-  else
-    tft.setTextColor(0xFFFF, 0x0000);
+  if (nSats != nSatsPrevious)
+  {
+    if (nSats == 0)
+    {
+      tft.setTextColor(0xFFE0, 0x0000);
+      Timer3.stop();
+      Timer3.setFrequency(20.0);
+      Timer3.start();
+    }
+    else if (nSats >= 4)
+    {
+      tft.setTextColor(0x07E0, 0x0000);
+      Timer3.stop();
+      Timer3.setFrequency(7.0);
+      Timer3.start();
+    }
+    else
+    {
+      tft.setTextColor(0xFFFF, 0x0000);
+      Timer3.stop();
+      Timer3.setFrequency(2.0);
+      Timer3.start();
+    }
+  }
 
-  tft.print(F("# of sats: "));
-  tft.println(nSats, 2);
+  nSatsPrevious = nSats;
 
-  tft.print(F(" Location: ")); 
+  PRINT(F("# of sats: "));
+  PRINTLN(nSats, 2);
+
+  PRINT(F(" Location: ")); 
   if (gps.location.isValid())
   {
-    tft.print(gps.location.lat(), 6);
-    tft.print(F(","));
-    tft.println(gps.location.lng(), 6);
+    PRINT(gps.location.lat(), 6);
+    PRINT(F(","));
+    PRINTLN(gps.location.lng(), 6);
   }
   else
   {
-     tft.println(F("INVALID"));
+     PRINTLN(F("INVALID"));
   }
 
   if (gps.time.isValid())
   {
-    tft.print(F(" Time: "));
-    if (gps.time.hour() < 10) tft.print(F("0"));
-    tft.print(gps.time.hour());
-    tft.print(F(":"));
-    if (gps.time.minute() < 10) tft.print(F("0"));
-    tft.print(gps.time.minute());
-    tft.print(F(":"));
-    if (gps.time.second() < 10) tft.print(F("0"));
-    tft.print(gps.time.second());
-    tft.print(F("."));
-    if (gps.time.centisecond() < 10) tft.print(F("0"));
-    tft.println(gps.time.centisecond());
+    PRINT(F(" Time: "));
+    if (gps.time.hour() < 10) PRINT(F("0"));
+    PRINT(gps.time.hour());
+    PRINT(F(":"));
+    if (gps.time.minute() < 10) PRINT(F("0"));
+    PRINT(gps.time.minute());
+    PRINT(F(":"));
+    if (gps.time.second() < 10) PRINT(F("0"));
+    PRINT(gps.time.second());
+    PRINT(F("."));
+    if (gps.time.centisecond() < 10) PRINT(F("0"));
+    PRINTLN(gps.time.centisecond());
   }
   else
-  {
-    tft.println(F("INVALID"));
-  }
+    PRINTLN(F("INVALID"));
 
   if (gps.speed.isValid())
   {
-    tft.print(F(" "));
-    tft.print(gps.speed.kmph());
-    tft.println(F(" kph"));
+    PRINT(F(" "));
+    PRINT(gps.speed.kmph());
+    PRINTLN(F(" kph"));
   }
 }
