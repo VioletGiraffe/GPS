@@ -1,11 +1,10 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1351.h>
-#include <Adafruit_ST7735.h>
 #include <SPI.h>
 #include <TinyGPS++.h>
 #include <DueTimer.h>
 
-static constexpr uint32_t GPSBaud = 9600;
+static constexpr uint32_t GPSBaud = 115200;
 
 TinyGPSPlus gps;
 
@@ -17,10 +16,13 @@ TinyGPSPlus gps;
 Adafruit_SSD1351 tft(cs, dc, mosi, sck, rst);
 //Adafruit_ST7735 tft(cs, dc, mosi, sck, rst);
 
+// #define PRINT(...) Serial.print(__VA_ARGS__)
+// #define PRINTLN(...) Serial.println(__VA_ARGS__)
+
 #define PRINT(...) tft.print(__VA_ARGS__)
 #define PRINTLN(...) tft.println(__VA_ARGS__)
 
-inline void blinkLED()
+static void blinkLED()
 {
 	static bool ledOn = false;
 	ledOn = !ledOn;
@@ -34,12 +36,14 @@ void setup()
 {
 	Serial.begin(115200);
 	Serial2.begin(GPSBaud);
+
 	// tft.initR(INITR_144GREENTAB);
 	tft.begin();
 	tft.fillScreen(0x0000);
 	tft.setTextSize(1);
 	tft.setTextColor(0xFFFF, 0x0000);
 	tft.setTextWrap(true);
+	tft.print("Screen test");
 
 	pinMode(13, OUTPUT);
 
@@ -58,7 +62,7 @@ void loop()
 
 void displayInfo()
 {
-	static uint32_t nSatsPrevious = ~0;
+	static uint32_t nSatsPrevious = ~0u;
 
 	tft.setCursor(0, 0);
 
@@ -86,14 +90,14 @@ void displayInfo()
 			Timer3.setFrequency(2.0);
 			Timer3.start();
 		}
+
+		nSatsPrevious = nSats;
 	}
 
-	nSatsPrevious = nSats;
-
 	PRINT(F("# of sats: "));
-	PRINTLN(nSats, 2);
+	PRINTLN(nSats);
 
-	PRINT(F(" Location: "));
+	PRINT(F("Location: "));
 	if (gps.location.isValid())
 	{
 		PRINT(gps.location.lat(), 6);
@@ -102,7 +106,7 @@ void displayInfo()
 	}
 	else
 	{
-		PRINTLN(F("INVALID"));
+		PRINTLN(F("INVALID   "));
 	}
 
 	if (gps.time.isValid())
