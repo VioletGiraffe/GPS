@@ -1,8 +1,6 @@
 language: python
-python:
-    - "2.7"
 install:
-    - pip install -U platformio
+    - pip3 install -U platformio
 script:
 #    - platformio run -e esp32
 #    - rm -rf ./.piolibdeps
