@@ -1,21 +1,21 @@
-#include <Wire.h>
+#include <Arduino.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1351.h>
+#include <Adafruit_ST7735.h>
 #include <SPI.h>
+#include <Wire.h>
 #include <TinyGPS++.h>
-#include <DueTimer.h>
 
 static constexpr uint32_t GPSBaud = 115200;
 
 TinyGPSPlus gps;
 
-#define sck 3
-#define mosi 2
-#define dc 4
-#define cs 5
-#define rst 6
-Adafruit_SSD1351 tft(cs, dc, mosi, sck, rst);
-//Adafruit_ST7735 tft(cs, dc, mosi, sck, rst);
+#define sck 18
+#define mosi 23
+#define dc 27
+#define cs 15
+#define rst 4
+//Adafruit_SSD1351 tft(cs, dc, mosi, sck, rst);
+Adafruit_ST7735 tft(cs, dc, rst);
 
 // #define PRINT(...) Serial.print(__VA_ARGS__)
 // #define PRINTLN(...) Serial.println(__VA_ARGS__)
@@ -23,14 +23,8 @@ Adafruit_SSD1351 tft(cs, dc, mosi, sck, rst);
 #define PRINT(...) tft.print(__VA_ARGS__)
 #define PRINTLN(...) tft.println(__VA_ARGS__)
 
-static void blinkLED()
-{
-	static bool ledOn = false;
-	ledOn = !ledOn;
-	if (ledOn)
-		PIOB->PIO_SODR = 1 << 27; //lights the LED
-	else
-		PIOB->PIO_CODR = 1 << 27; //clears it
+inline static constexpr uint16_t to565(uint8_t r, uint8_t g, uint8_t b) {
+	return ((static_cast<uint16_t>(b & 0b11111000) << 8) | (static_cast<uint16_t>(g & 0b11111100) << 3) | (static_cast<uint16_t>(r) >> 3));
 }
 
 void setup()
@@ -38,17 +32,15 @@ void setup()
 	Serial.begin(115200);
 	Serial2.begin(GPSBaud);
 
-	// tft.initR(INITR_144GREENTAB);
-	tft.begin();
+	tft.initR(INITR_MINI160x80);
+	tft.setRotation(3);
 	tft.fillScreen(0x0000);
-	tft.setTextSize(1);
-	tft.setTextColor(0xFFFF, 0x0000);
+	tft.setTextSize(2);
+	tft.setTextColor(to565(0, 0, 0), to565(255, 0, 0));
 	tft.setTextWrap(true);
-	tft.print("Screen test");
+	tft.print("No GPS info yet, waiting...");
 
-	pinMode(13, OUTPUT);
-
-	Timer3.attachInterrupt(&blinkLED);
+	//pinMode(13, OUTPUT);
 }
 
 void loop()
@@ -65,6 +57,7 @@ void displayInfo()
 {
 	static uint32_t nSatsPrevious = ~0u;
 
+	tft.setTextSize(1);
 	tft.setCursor(0, 0);
 
 	const auto nSats = gps.satellites.value();
@@ -73,23 +66,14 @@ void displayInfo()
 		if (nSats == 0)
 		{
 			tft.setTextColor(0xFFE0, 0x0000);
-			Timer3.stop();
-			Timer3.setFrequency(20.0);
-			Timer3.start();
 		}
 		else if (nSats >= 4)
 		{
 			tft.setTextColor(0x07E0, 0x0000);
-			Timer3.stop();
-			Timer3.setFrequency(7.0);
-			Timer3.start();
 		}
 		else
 		{
 			tft.setTextColor(0xFFFF, 0x0000);
-			Timer3.stop();
-			Timer3.setFrequency(2.0);
-			Timer3.start();
 		}
 
 		nSatsPrevious = nSats;
